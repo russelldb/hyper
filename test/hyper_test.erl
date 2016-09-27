@@ -30,7 +30,6 @@ hyper_test_() ->
       ?_test(union_mixed_precision_t()),
       ?_test(intersect_card_t()),
       ?_test(bad_serialization_t()),
-      {"Union property with hyper_carry", RunProp(prop_union(hyper_carray))},
       {"Union property with hyper_binary", RunProp(prop_union(hyper_binary))},
       {"Union property with hyper_array", RunProp(prop_union(hyper_array))},
       {"Union property with hyper_gb", RunProp(prop_union(hyper_gb))},
@@ -88,12 +87,10 @@ backend_t() ->
     Gb     = hyper:compact(hyper:insert_many(Values, hyper:new(P, hyper_gb))),
     Array  = hyper:compact(hyper:insert_many(Values, hyper:new(P, hyper_array))),
     Binary = hyper:compact(hyper:insert_many(Values, hyper:new(P, hyper_binary))),
-    Carray = hyper:compact(hyper:insert_many(Values, hyper:new(P, hyper_carray))),
 
     {hyper_gb    , GbRegisters}     = Gb#hyper.registers,
     {hyper_array , ArrayRegisters}  = Array#hyper.registers,
     {hyper_binary, BinaryRegisters} = Binary#hyper.registers,
-    {hyper_carray, CarrayRegisters} = Carray#hyper.registers,
 
     ExpectedRegisters = lists:foldl(
                           fun (Value, Registers) ->
@@ -123,22 +120,18 @@ backend_t() ->
     ?assertEqual(ExpectedBytes, hyper_gb:encode_registers(GbRegisters)),
     ?assertEqual(ExpectedBytes, hyper_array:encode_registers(ArrayRegisters)),
     ?assertEqual(ExpectedBytes, hyper_binary:encode_registers(BinaryRegisters)),
-    ?assertEqual(ExpectedBytes, hyper_carray:encode_registers(CarrayRegisters)),
 
     ?assertEqual(hyper:card(Gb),
                  hyper:card(hyper:from_json(hyper:to_json(Array), hyper_gb))),
     ?assertEqual(Array, hyper:from_json(hyper:to_json(Array), hyper_array)),
     ?assertEqual(Binary, hyper:from_json(hyper:to_json(Binary), hyper_binary)),
-    ?assertEqual(Carray, hyper:from_json(hyper:to_json(Carray), hyper_carray)),
 
 
     ?assertEqual(hyper:to_json(Gb), hyper:to_json(Array)),
     ?assertEqual(hyper:to_json(Gb), hyper:to_json(Binary)),
-    ?assertEqual(hyper:to_json(Gb), hyper:to_json(Carray)),
 
     ?assertEqual(hyper:card(Gb), hyper:card(Array)),
-    ?assertEqual(hyper:card(Gb), hyper:card(Binary)),
-    ?assertEqual(hyper:card(Gb), hyper:card(Carray)).
+    ?assertEqual(hyper:card(Gb), hyper:card(Binary)).
 
 
 
@@ -350,7 +343,7 @@ bad_serialization_t() ->
 %%
 
 backends() ->
-    [hyper_gb, hyper_array, hyper_binary, hyper_carray].
+    [hyper_gb, hyper_array, hyper_binary].
 
 
 gen_values() ->
