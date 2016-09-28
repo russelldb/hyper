@@ -2,7 +2,7 @@
 
 all: deps compile
 
-compile:
+compile: deps
 		./rebar compile
 
 deps:
@@ -14,12 +14,10 @@ clean:
 doc: all
 		./rebar doc
 
-perf_report:
-		./rebar -C rebar-test.config get compile
+perf_report: compile
 		erl -pa deps/*/ebin ebin -noshell -run hyper perf_report -s init stop
 
-estimate_report:
-		./rebar -C rebar-test.config get compile
+estimate_report: compile
 		erl -pa deps/*/ebin ebin -noshell -run hyper estimate_report -s init stop
 		bin/plot.R
 

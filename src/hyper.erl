@@ -132,12 +132,15 @@ card(#hyper{registers = {Mod, Registers0}, p = P}) ->
 precision(#hyper{p = Precision}) ->
     Precision.
 
+-spec bytes(#hyper{}) -> integer().
 bytes(#hyper{registers = {Mod, Registers}}) ->
     Mod:bytes(Registers).
 
+-spec compact(#hyper{}) -> #hyper{}.
 compact(#hyper{registers = {Mod, Registers}} = Hyper) ->
     Hyper#hyper{registers = {Mod, Mod:compact(Registers)}}.
 
+-spec reduce_precision(precision(), #hyper{}) -> #hyper{}.
 reduce_precision(P, #hyper{p = OldP, registers = {Mod, Registers}} = Hyper)
   when P < OldP ->
     Hyper#hyper{p = P, registers = {Mod, Mod:reduce_precision(P, Registers)}};
@@ -268,14 +271,15 @@ estimate_report() ->
 
     io:format(F, "p,card,median,p05,p95~n", []),
 
-    [begin
+    _ = lists:foreach(
+        fun(P) ->
          Stats = [run_report(P, Card, Repetitions) || Card <- Cardinalities],
-         lists:map(fun ({Card, Median, P05, P95}) ->
+         lists:foreach(fun ({Card, Median, P05, P95}) ->
                            io:format(F,
                                      "~p,~p,~p,~p,~p~n",
                                      [P, Card, Median, P05, P95])
                    end, Stats)
-     end || P <- Ps],
+        end, Ps),
     io:format("~n"),
     file:close(F).
 
@@ -285,7 +289,7 @@ run_report(P, Card, Repetitions) ->
                           fun (I) ->
                                   io:format("~p values with p=~p, rep ~p~n",
                                             [Card, P, I]),
-                                  random:seed(erlang:now()),
+                                  _ = random:seed(erlang:now()),
                                   Elements = generate_unique(Card),
                                   Estimate = card(insert_many(Elements, new(P))),
                                   abs(Card - Estimate) / Card
@@ -328,7 +332,7 @@ perf_report() ->
 
     R = [begin
              io:format("."),
-             random:seed(1, 2, 3),
+             _ = random:seed(1, 2, 3),
 
              M = trunc(math:pow(2, P)),
              InsertUs = Time(fun (Values, H) ->
