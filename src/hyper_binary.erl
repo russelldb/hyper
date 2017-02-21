@@ -5,9 +5,8 @@
 %% inserts to perform in the future.
 
 -module(hyper_binary).
--include_lib("eunit/include/eunit.hrl").
+
 -behaviour(hyper_register).
-%%-compile(native).
 
 -export([new/1,
          set/3,
@@ -20,6 +19,10 @@
          zero_count/1,
          encode_registers/1,
          decode_registers/2]).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -define(VALUE_SIZE, 6).
 -define(MERGE_THRESHOLD, 0.05).

@@ -1,7 +1,7 @@
 -module(hyper_gb).
--include_lib("eunit/include/eunit.hrl").
 
 -behaviour(hyper_register).
+
 -export([new/1,
          set/3,
          max_merge/1,
@@ -13,6 +13,10 @@
          encode_registers/1,
          decode_registers/2,
          compact/1]).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 new(P) ->
     {gb_trees:empty(), trunc(math:pow(2, P))}.
@@ -53,6 +57,11 @@ max_merge(Small, Big) ->
 reduce_precision(_NewP, _Register) ->
     throw(not_implemented).
 
+%% TODO: WARNING - This code is too sleazy for words!
+%% This REALLY needs to be implemented with gb_trees:iterator.
+%% We can't fix the type specification for register_sum/1 with the
+%% current implementation, and it directly relies on the internal
+%% structure of an opaque type in OTP.
 fold(F, A, {{_, T}, _M}) when is_function(F, 3) ->
     fold_1(F, A, T).
 
@@ -67,7 +76,8 @@ bytes({T, _}) ->
     erts_debug:flat_size(T) * 8.
 
 
--spec register_sum({gb_tree(),number()}) -> float().
+%% Should be gb_trees:tree(), but can't be because of fold/3 above.
+-spec register_sum({{_, _}, number()}) -> float().
 register_sum({T, M}) ->
     {MaxI, Sum} = fold(fun (Index, Value, {I, Acc}) ->
                             Zeroes = Index - I - 1,

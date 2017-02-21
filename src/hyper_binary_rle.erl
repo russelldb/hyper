@@ -1,11 +1,14 @@
 -module(hyper_binary_rle).
--include_lib("eunit/include/eunit.hrl").
+
+-behaviour(hyper_register).
 
 -export([new/1, set/3, compact/1, max_merge/1, max_merge/2,
          reduce_precision/2, bytes/1]).
 -export([register_sum/1, zero_count/1, encode_registers/1, decode_registers/2]).
 
--behaviour(hyper_register).
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -define(KEY_SIZE, 16).
 -define(REPEAT, 16/integer).

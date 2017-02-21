@@ -3,7 +3,6 @@
 %% http://static.googleusercontent.com/external_content/untrusted_dlcp/
 %% research.google.com/en//pubs/archive/40671.pdf
 -module(hyper).
-%%-compile(native).
 
 -export([new/1, new/2, insert/2, insert_many/2]).
 -export([union/1, union/2]).
@@ -11,19 +10,25 @@
 -export([to_json/1, from_json/1, from_json/2, precision/1, bytes/1, is_hyper/1]).
 -export([compact/1, reduce_precision/2]).
 
+-export_type([filter/0, precision/0, registers/0]).
+
+-ifdef(TEST).
+-export([
+    generate_unique/1,
+    rand_module/0,
+    run_of_zeroes/1
+]).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -type precision() :: 4..16.
 -type registers() :: any().
 
 -record(hyper, {p :: precision(),
-                registers :: {module(), registers()}}).
+    registers :: {module(), registers()}}).
 
 -type value()     :: binary().
 -type filter()    :: #hyper{}.
-
--export_type([filter/0, precision/0, registers/0]).
-
-%% Exported for testing
--export([run_of_zeroes/1, perf_report/0, estimate_report/0]).
 
 -define(DEFAULT_BACKEND, hyper_binary).
 
@@ -221,12 +226,11 @@ nearest_neighbours(E, Vector) ->
     Indexes.
 
 
+-ifdef(TEST).
 
-
-%%
-%% REPORTS
-%%
-
+%% ===================================================================
+%% Test Helpers
+%% ===================================================================
 
 generate_unique(N) ->
     generate_unique(lists:usort(random_bytes(N)), N).
@@ -241,13 +245,13 @@ generate_unique(L, N) ->
 
 
 random_bytes(N) ->
-    random_bytes([], N).
+    random_bytes(N, rand_module(), []).
 
-random_bytes(Acc, 0) -> Acc;
-random_bytes(Acc, N) ->
-    Int = random:uniform(100000000000000),
-    random_bytes([<<Int:64/integer>> | Acc], N-1).
-
+random_bytes(N, Mod, Result) when N > 0 ->
+    Int = Mod:uniform(100000000000000),
+    [<<Int:64/integer>> | Result];
+random_bytes(_, _, Result) ->
+    Result.
 
 
 %% Lifted from berk, https://github.com/richcarl/berk/blob/master/berk.erl
@@ -255,12 +259,44 @@ median(Ns) ->
     N = length(Ns),
     Ss = lists:sort(Ns),
     if (N rem 2) > 0 ->
-            lists:nth(1+trunc(N/2), Ss);
-       true ->
+        lists:nth(1+trunc(N/2), Ss);
+        true ->
             [X1,X2] = lists:sublist(Ss, trunc(N/2),2),
             (X1+X2)/2
     end.
 
+
+rand_module() ->
+    Key = {?MODULE, rand_mod},
+    case erlang:get(Key) of
+        undefined ->
+            Mod = case code:which(rand) of
+                non_existing ->
+                    M = random,
+                    case erlang:get(random_seed) of
+                        undefined ->
+                            _ = M:seed(os:timestamp()),
+                            M;
+                        _ ->
+                            M
+                    end;
+                _ ->
+                    rand
+            end,
+            _ = erlang:put(Key, Mod),
+            Mod;
+        Val ->
+            Val
+    end.
+
+%% ===================================================================
+%% Test Reports
+%% ===================================================================
+%%
+%% These take a VERY long time to run, making them just about unusable.
+%% TODO: They SHOULD be restructured to be more efficient.
+%% Possibilities include QuickCheck and/or parallel EUnit execution.
+%%
 
 estimate_report() ->
     Ps            = lists:seq(11, 16),
@@ -268,34 +304,28 @@ estimate_report() ->
     Repetitions   = 50,
 
     {ok, F} = file:open("estimates.csv", [write]),
+    io:put_chars(F, "p,card,median,p05,p95\n"),
 
-    io:format(F, "p,card,median,p05,p95~n", []),
-
-    _ = lists:foreach(
+    lists:foreach(
         fun(P) ->
-         Stats = [run_report(P, Card, Repetitions) || Card <- Cardinalities],
-         lists:foreach(fun ({Card, Median, P05, P95}) ->
-                           io:format(F,
-                                     "~p,~p,~p,~p,~p~n",
-                                     [P, Card, Median, P05, P95])
-                   end, Stats)
+            Stats = [run_report(P, Card, Repetitions) || Card <- Cardinalities],
+            lists:foreach(fun ({Card, Median, P05, P95}) ->
+                io:format(F,
+                    "~p,~p,~p,~p,~p~n",
+                    [P, Card, Median, P05, P95])
+            end, Stats)
         end, Ps),
-    io:format("~n"),
+    io:nl(F),
     file:close(F).
 
-
 run_report(P, Card, Repetitions) ->
-    {ok, Estimations} = s2_par:map(
-                          fun (I) ->
-                                  io:format("~p values with p=~p, rep ~p~n",
-                                            [Card, P, I]),
-                                  _ = random:seed(erlang:now()),
-                                  Elements = generate_unique(Card),
-                                  Estimate = card(insert_many(Elements, new(P))),
-                                  abs(Card - Estimate) / Card
-                          end,
-                          lists:seq(1, Repetitions),
-                          [{workers, 8}]),
+    Estimations = [
+        begin
+            io:format(user, "~p values with p=~p, rep ~p~n", [Card, P, I]),
+            Elements = generate_unique(Card),
+            Estimate = card(insert_many(Elements, new(P))),
+            abs(Card - Estimate) / Card
+        end || I <- lists:seq(1, Repetitions)],
 
     Hist = basho_stats_histogram:update_all(
              Estimations,
@@ -308,12 +338,11 @@ run_report(P, Card, Repetitions) ->
     P95 = basho_stats_histogram:quantile(0.95, Hist),
     {Card, median(Estimations), P05, P95}.
 
-
 perf_report() ->
     Ps      = [15],
     Cards   = [1, 100, 500, 1000, 2500, 5000, 10000,
                15000, 25000, 50000, 100000, 1000000],
-    Mods    = [hyper_gb, hyper_array, hyper_binary, hyper_carray],
+    Mods    = [hyper_gb, hyper_array, hyper_binary],
     Repeats = 10,
 
     Time = fun (F, Args) ->
@@ -331,7 +360,7 @@ perf_report() ->
 
 
     R = [begin
-             io:format("."),
+             io:format(user, ".", []),
              _ = random:seed(1, 2, 3),
 
              M = trunc(math:pow(2, P)),
@@ -366,8 +395,8 @@ perf_report() ->
          end || Mod  <- Mods,
                 P    <- Ps,
                 Card <- Cards],
-    io:format("~n"),
-    io:format("~s ~s ~s ~s ~s ~s ~s ~s ~s~n",
+    io:nl(user),
+    io:format(user, "~s ~s ~s ~s ~s ~s ~s ~s ~s~n",
               [string:left("module"     , 12, $ ),
                string:left("P"          ,  4, $ ),
                string:right("card"      ,  8, $ ),
@@ -391,7 +420,7 @@ perf_report() ->
                                      io_lib:format("~.2f", [AvgCardUs / 1000])),
                           ToJsonMs = lists:flatten(
                                        io_lib:format("~.2f", [AvgToJsonUs / 1000])),
-                          io:format("~s ~s ~s ~s ~s ~s ~s ~s ~s~n",
+                          io:format(user, "~s ~s ~s ~s ~s ~s ~s ~s ~s~n",
                                     [
                                      string:left(atom_to_list(Mod)      , 12, $ ),
                                      string:left(integer_to_list(P)     ,  4, $ ),
@@ -404,3 +433,5 @@ perf_report() ->
                                      string:right(ToJsonMs              , 10, $ )
                                     ])
                   end, R).
+
+-endif. % TEST
