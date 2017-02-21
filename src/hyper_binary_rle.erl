@@ -65,6 +65,7 @@ max_merge(Small, Big) ->
     do_max_merge(Small, Big).
 
 
+-spec reduce_precision(hyper:precision(), hyper:registers()) -> no_return().
 reduce_precision(_NewP, _B) ->
     throw(not_implemented).
 
