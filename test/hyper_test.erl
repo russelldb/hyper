@@ -174,21 +174,23 @@ register_sum_test() ->
 
 %% Test is currently deactivated because it takes forever - times out
 %% after 10 minutes on a very fast machine, never seen it finish.
-error_range_test_x() ->
-    Mods = backends(),
-    Run = fun (Cardinality, P, Mod) ->
-                  lists:foldl(fun (V, H) ->
-                                      hyper:insert(V, H)
-                              end, hyper:new(P, Mod), hyper:generate_unique(Cardinality))
-          end,
-    ExpectedError = 0.02,
-    P = 14,
+error_range_test_() ->
+    {timeout, 600, fun() ->
+        Mods = backends(),
+        Run = fun(Cardinality, P, Mod) ->
+            lists:foldl(fun(V, H) ->
+                hyper:insert(V, H)
+            end, hyper:new(P, Mod), hyper:generate_unique(Cardinality))
+        end,
+        ExpectedError = 0.02,
+        P = 14,
 
-    [begin
-         Estimate = trunc(hyper:card(Run(Card, P, Mod))),
-         ?assert(abs(Estimate - Card) < Card * ExpectedError)
-     end || Card <- lists:seq(1000, 50000, 5000),
-            Mod <- Mods].
+        [begin
+            Estimate = trunc(hyper:card(Run(Card, P, Mod))),
+            ?assert(abs(Estimate - Card) < Card * ExpectedError)
+        end || Card <- lists:seq(1000, 50000, 5000),
+            Mod <- Mods]
+    end}.
 
 many_union_test() ->
     Card = 100,
