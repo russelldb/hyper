@@ -172,10 +172,8 @@ register_sum_test() ->
      end || Mod <- Mods].
 
 
-%% Test is currently deactivated because it takes forever - times out
-%% after 10 minutes on a very fast machine, never seen it finish.
 error_range_test_() ->
-    {timeout, 600, fun() ->
+    {timeout, 60, fun() ->
         Mods = backends(),
         Run = fun(Cardinality, P, Mod) ->
             lists:foldl(fun(V, H) ->

@@ -249,7 +249,7 @@ random_bytes(N) ->
 
 random_bytes(N, Mod, Result) when N > 0 ->
     Int = Mod:uniform(100000000000000),
-    [<<Int:64/integer>> | Result];
+    random_bytes((N - 1), Mod, [<<Int:64/integer>> | Result]);
 random_bytes(_, _, Result) ->
     Result.
 
